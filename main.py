@@ -10,7 +10,7 @@ API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8"
 
 # 2. 팀원 매핑 (이름: 이메일)
 TEAM_INFO = {
-    "동건": "jeh0224@gachon.ac.kr",
+    "은호": "jeh0224@gachon.ac.kr",
     "팀원2이름": "email2@gachon.ac.kr", # 실제 노션 이름과 이메일로 수정하세요
     "팀원3이름": "email3@gachon.ac.kr",
     "팀원4이름": "email4@gachon.ac.kr"
