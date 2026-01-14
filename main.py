@@ -8,7 +8,7 @@ DATABASE_ID = os.environ['DATABASE_ID']
 API_URL = "실제_포스트_받는_URL_주소" # 예: https://api.daily-snippet.com/post
 
 TEAM_INFO = {
-    "동건": "jeh0224@gachon.ac.kr",
+    "은호": "jeh0224@gachon.ac.kr",
     "팀원2이름": "email2@gachon.ac.kr",
     "팀원3이름": "email3@gachon.ac.kr",
     "팀원4이름": "email4@gachon.ac.kr"
