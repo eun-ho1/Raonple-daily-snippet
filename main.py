@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 # 환경 변수 로드
 NOTION_TOKEN = os.environ['NOTION_TOKEN']
 DATABASE_ID = os.environ['DATABASE_ID']
-API_URL = "실제_포스트_받는_URL_주소" # 예: https://api.daily-snippet.com/post
+API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8" # 예: https://api.daily-snippet.com/post
 
 TEAM_INFO = {
     "은호": "jeh0224@gachon.ac.kr",
