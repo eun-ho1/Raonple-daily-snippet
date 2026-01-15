@@ -6,13 +6,14 @@ from datetime import datetime, timedelta
 NOTION_TOKEN = os.environ.get('NOTION_TOKEN')
 DATABASE_ID = os.environ.get('DATABASE_ID')
 SNIPPET_API_KEY = os.environ.get('SNIPPET_API_KEY', '8195198d-500e-4082-aefd-bab59bfda0bf')
-API_URL = "여기에_실제_API_엔드포인트_주소를_입력하세요"
+API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8"
 
 # 2. 팀원 매핑 (노션 이름 : 이메일)
 TEAM_INFO = {
     "은호": "jeh0224@gachon.ac.kr",
-    "동건": "donggun_email@example.com",
-    "유신": "yusin_email@example.com"
+    "동건": "2donggeon@gachon.ac.kr",
+    "유신": "wooxx3377@gachon.ac.kr",
+    "형균": "gudrbs14@gachon.ac.kr"
 }
 
 def get_target_date_kst():
