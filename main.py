@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 NOTION_TOKEN = os.environ.get('NOTION_TOKEN')
 DATABASE_ID = os.environ.get('DATABASE_ID')
 SNIPPET_API_KEY = os.environ.get('SNIPPET_API_KEY', '8195198d-500e-4082-aefd-bab59bfda0bf')
-API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8"
+API_URL = "여기에_실제_API_엔드포인트_주소를_입력하세요"
 
 # 2. 팀원 매핑 (노션 이름 : 이메일)
 TEAM_INFO = {
@@ -15,8 +15,11 @@ TEAM_INFO = {
     "유신": "yusin_email@example.com"
 }
 
-def get_today_kst():
-    return (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d")
+def get_target_date_kst():
+    """실행 시점(KST)에서 하루를 뺀 '어제' 날짜 반환"""
+    # GitHub Actions는 UTC 기준이므로 9시간을 더해 KST를 만든 후, 1일을 뺍니다.
+    target_dt = datetime.utcnow() + timedelta(hours=9) - timedelta(days=1)
+    return target_dt.strftime("%Y-%m-%d")
 
 def get_page_body_content(page_id):
     """페이지 ID를 받아 내부 본문의 텍스트 내용을 추출합니다."""
@@ -31,13 +34,10 @@ def get_page_body_content(page_id):
     
     full_text = []
     for block in blocks:
-        # 문단(paragraph) 타입의 블록에서 텍스트 추출
         if block['type'] == 'paragraph':
             rich_texts = block['paragraph'].get('rich_text', [])
             for rt in rich_texts:
                 full_text.append(rt.get('plain_text', ''))
-        
-        # 목록(bulleted_list_item) 타입 등 필요시 추가 가능
         elif block['type'] == 'bulleted_list_item':
             rich_texts = block['bulleted_list_item'].get('rich_text', [])
             for rt in rich_texts:
@@ -52,11 +52,14 @@ def run_automation():
         "Notion-Version": "2022-06-28"
     }
     
-    today = get_today_kst()
+    # ⭐️ 1월 15일 새벽 3시에 실행되면 1월 14일이 타겟이 됩니다.
+    target_date = get_target_date_kst()
+    print(f"조회 대상 날짜(어제): {target_date}")
+
     query = {
         "filter": {
             "property": "날짜",
-            "date": { "equals": today }
+            "date": { "equals": target_date }
         }
     }
     
@@ -64,14 +67,13 @@ def run_automation():
     results = res.json().get('results', [])
 
     if not results:
-        print(f"{today} 날짜의 데이터를 찾지 못했습니다.")
+        print(f"{target_date} 날짜에 해당하는 데이터를 찾지 못했습니다.")
         return
 
     for page in results:
         page_id = page['id']
         props = page['properties']
         
-        # 팀원 이름 가져오기
         member_data = props.get('팀원', {}).get('select') or props.get('팀원', {}).get('multi_select', [None])[0]
         if not member_data: continue
         
@@ -79,11 +81,8 @@ def run_automation():
         
         if name in TEAM_INFO:
             email = TEAM_INFO[name]
-            
-            # ⭐️ 핵심: 제목 대신 페이지 본문 내용을 가져옵니다.
             page_content = get_page_body_content(page_id)
             
-            # 만약 본문이 비어있으면 제목이라도 보낼 수 있게 예외 처리
             if not page_content:
                 title_list = props.get('제목', {}).get('title', [])
                 page_content = title_list[0]['plain_text'] if title_list else "내용 없음"
@@ -91,12 +90,12 @@ def run_automation():
             payload = {
                 "user_email": email,
                 "api_id": SNIPPET_API_KEY,
-                "snippet_date": today,
-                "content": page_content # 추출한 본문 내용 전송
+                "snippet_date": target_date,
+                "content": page_content
             }
             
             response = requests.post(API_URL, json=payload)
-            print(f"✅ {name} 본문 전송: {response.status_code}")
+            print(f"✅ {name}({target_date}분) 전송: {response.status_code}")
 
 if __name__ == "__main__":
     run_automation()
