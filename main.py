@@ -16,8 +16,9 @@ TEAM_INFO = {
 
 def get_target_date_kst():
     # 현재 테스트를 위해 오늘 날짜 기준 (어제 데이터를 보내려면 - timedelta(days=1) 추가)
-    return (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d")  - timedelta(days=1)
-
+    target_dt = datetime.utcnow() + timedelta(hours=9)  - timedelta(days=1)
+    return target_dt.strftime("%Y-%m-%d")
+    
 def get_page_body_content(page_id):
     """노션 본문을 읽어 HTML 줄바꿈 형식으로 변환합니다."""
     url = f"https://api.notion.com/v1/blocks/{page_id}/children"
