@@ -10,8 +10,9 @@ API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8"
 
 TEAM_INFO = {
     "은호": "jeh0224@gachon.ac.kr",
-    "동건": "donggun_email@example.com",
-    "유신": "yusin_email@example.com"
+    "동건": "2donggeon@gachon.ac.kr",
+    "유신": "wooxx3377@gachon.ac.kr",
+    "형균": "gudrbs14@gachon.ac.kr"
 }
 
 def get_target_date_kst():
