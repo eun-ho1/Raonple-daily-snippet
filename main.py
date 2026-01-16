@@ -6,24 +6,22 @@ from datetime import datetime, timedelta
 NOTION_TOKEN = os.environ.get('NOTION_TOKEN')
 DATABASE_ID = os.environ.get('DATABASE_ID')
 SNIPPET_API_KEY = os.environ.get('SNIPPET_API_KEY', '8195198d-500e-4082-aefd-bab59bfda0bf')
-API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8"
+API_URL = "여기에_실제_API_엔드포인트_주소를_입력하세요"
 
 # 2. 팀원 매핑 (노션 이름 : 이메일)
 TEAM_INFO = {
     "은호": "jeh0224@gachon.ac.kr",
-    "동건": "2donggeon@gachon.ac.kr",
-    "유신": "wooxx3377@gachon.ac.kr",
-    "형균": "gudrbs14@gachon.ac.kr"
+    "동건": "donggun_email@example.com",
+    "유신": "yusin_email@example.com"
 }
 
 def get_target_date_kst():
-    """실행 시점(KST)에서 하루를 뺀 '어제' 날짜 반환"""
-    # GitHub Actions는 UTC 기준이므로 9시간을 더해 KST를 만든 후, 1일을 뺍니다.
+    # KST 기준 어제 날짜 계산
     target_dt = datetime.utcnow() + timedelta(hours=9) - timedelta(days=1)
     return target_dt.strftime("%Y-%m-%d")
 
 def get_page_body_content(page_id):
-    """페이지 ID를 받아 내부 본문의 텍스트 내용을 추출합니다."""
+    """페이지 ID를 받아 내부 본문의 줄바꿈을 보존하여 텍스트를 추출합니다."""
     url = f"https://api.notion.com/v1/blocks/{page_id}/children"
     headers = {
         "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -33,18 +31,33 @@ def get_page_body_content(page_id):
     response = requests.get(url, headers=headers)
     blocks = response.json().get('results', [])
     
-    full_text = []
+    lines = []
     for block in blocks:
-        if block['type'] == 'paragraph':
-            rich_texts = block['paragraph'].get('rich_text', [])
-            for rt in rich_texts:
-                full_text.append(rt.get('plain_text', ''))
-        elif block['type'] == 'bulleted_list_item':
-            rich_texts = block['bulleted_list_item'].get('rich_text', [])
-            for rt in rich_texts:
-                full_text.append(f"• {rt.get('plain_text', '')}")
+        b_type = block['type']
+        block_text = ""
+        
+        # 텍스트가 포함될 수 있는 주요 블록 타입들 처리
+        if b_type in ['paragraph', 'bulleted_list_item', 'numbered_list_item', 'heading_1', 'heading_2', 'heading_3']:
+            rich_texts = block[b_type].get('rich_text', [])
+            # 한 블록 내부의 텍스트 조각들을 하나로 합침 (줄바꿈 없이)
+            block_text = "".join([rt.get('plain_text', '') for rt in rich_texts])
+            
+            # 리스트 기호 추가
+            if b_type == 'bulleted_list_item':
+                block_text = f"• {block_text}"
+            elif b_type == 'numbered_list_item':
+                block_text = f"- {block_text}"
+        
+        # 빈 줄이든 내용이 있든 일단 한 줄로 간주하여 추가
+        lines.append(block_text)
 
-    return "\n".join(full_text).strip()
+    # 1. 일반적인 줄바꿈(\n)으로 합침
+    final_content = "\n".join(lines).strip()
+    
+    # 2. 만약 웹 페이지에서 줄바꿈이 안 보인다면 아래 주석(#)을 해제하고 사용하세요.
+    # final_content = final_content.replace("\n", "<br>")
+    
+    return final_content
 
 def run_automation():
     headers = {
@@ -53,9 +66,8 @@ def run_automation():
         "Notion-Version": "2022-06-28"
     }
     
-    # ⭐️ 1월 15일 새벽 3시에 실행되면 1월 14일이 타겟이 됩니다.
     target_date = get_target_date_kst()
-    print(f"조회 대상 날짜(어제): {target_date}")
+    print(f"조회 대상 날짜: {target_date}")
 
     query = {
         "filter": {
@@ -68,7 +80,7 @@ def run_automation():
     results = res.json().get('results', [])
 
     if not results:
-        print(f"{target_date} 날짜에 해당하는 데이터를 찾지 못했습니다.")
+        print(f"{target_date}의 데이터를 찾지 못했습니다.")
         return
 
     for page in results:
@@ -96,7 +108,7 @@ def run_automation():
             }
             
             response = requests.post(API_URL, json=payload)
-            print(f"✅ {name}({target_date}분) 전송: {response.status_code}")
+            print(f"✅ {name} 전송 성공: {response.status_code}")
 
 if __name__ == "__main__":
     run_automation()
