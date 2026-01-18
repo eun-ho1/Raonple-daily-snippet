@@ -18,7 +18,7 @@ TEAM_INFO = {
 def get_target_date_kst():
     """테스트를 위해 현재 '오늘' 날짜를 가져오도록 일시 수정했습니다."""
     # 실제 배포 시 어제 데이터를 보내려면 아래 - timedelta(days=1) 주석을 해제하세요.
-    target_dt = datetime.utcnow() + timedelta(hours=9) # - timedelta(days=1)
+    target_dt = datetime.utcnow() + timedelta(hours=9)  - timedelta(days=1)
     return target_dt.strftime("%Y-%m-%d")
 
 def get_page_body_content(page_id):
