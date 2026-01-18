@@ -2,7 +2,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 
-# 환경 변수 및 매핑 (기존 설정 유지)
+# 환경 변수 설정 (기존과 동일)
 NOTION_TOKEN = os.environ.get('NOTION_TOKEN')
 DATABASE_ID = os.environ.get('DATABASE_ID')
 SNIPPET_API_KEY = os.environ.get('SNIPPET_API_KEY', '8195198d-500e-4082-aefd-bab59bfda0bf')
@@ -10,18 +10,17 @@ API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8"
 
 TEAM_INFO = {
     "은호": "jeh0224@gachon.ac.kr",
-    "동건": "2donggeon@gachon.ac.kr",
-    "유신": "wooxx3377@gachon.ac.kr",
-    "형균": "gudrbs14@gachon.ac.kr"
+    "동건": "donggun_email@example.com",
+    "유신": "yusin_email@example.com"
 }
 
 def get_target_date_kst():
-    # 현재 테스트를 위해 오늘 날짜 기준 (어제 데이터를 보내려면 - timedelta(days=1) 추가)
-    target_dt = datetime.utcnow() + timedelta(hours=9)  - timedelta(days=1)
+    # KST 기준 어제 날짜 (1월 15일 실행 시 14일 데이터 전송)
+    target_dt = datetime.utcnow() + timedelta(hours=9) - timedelta(days=1)
     return target_dt.strftime("%Y-%m-%d")
-    
+
 def get_page_body_content(page_id):
-    """노션 본문을 읽어 HTML 줄바꿈 형식으로 변환합니다."""
+    """노션 본문을 읽어 시스템이 무시하지 못하도록 강한 줄바꿈 형식을 생성합니다."""
     url = f"https://api.notion.com/v1/blocks/{page_id}/children"
     headers = {
         "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -31,47 +30,51 @@ def get_page_body_content(page_id):
     response = requests.get(url, headers=headers)
     blocks = response.json().get('results', [])
     
-    lines = []
+    formatted_parts = []
     num_counter = 1
     
     for block in blocks:
         b_type = block['type']
         
-        # 텍스트 추출 가능 블록 처리
+        # 텍스트 추출
         if b_type in ['paragraph', 'bulleted_list_item', 'numbered_list_item', 'heading_1', 'heading_2', 'heading_3']:
             rich_texts = block[b_type].get('rich_text', [])
             text = "".join([rt.get('plain_text', '') for rt in rich_texts])
             
-            # 1. 제목 블록인 경우 앞뒤로 빈 줄을 넣어 가독성 확보
+            if not text.strip(): # 빈 줄인 경우
+                formatted_parts.append("\n")
+                continue
+
+            # 1. 제목 처리 (가독성을 위해 위아래로 빈 줄 추가)
             if b_type.startswith('heading_'):
-                lines.append("") # 제목 위 빈 줄
-                lines.append(f"<b>{text}</b>") # 제목은 굵게 처리 (지원될 경우)
+                formatted_parts.append(f"\n\n**{text}**\n")
                 num_counter = 1
             
-            # 2. 리스트 아이템 처리
+            # 2. 동그라미 불렛 처리 (패턴 인식 개선을 위해 * 사용)
             elif b_type == 'bulleted_list_item':
-                lines.append(f"• {text}")
+                formatted_parts.append(f"• {text}\n")
+            
+            # 3. 숫자 리스트 처리 (정상 작동하는 패턴 유지)
             elif b_type == 'numbered_list_item':
-                lines.append(f"{num_counter}. {text}")
+                formatted_parts.append(f"{num_counter}. {text}\n")
                 num_counter += 1
             
-            # 3. 일반 문단 처리
+            # 4. 일반 문단
             else:
-                if text.strip(): # 내용이 있을 때만 추가
-                    lines.append(text)
-                else: # 빈 줄인 경우
-                    lines.append("")
+                formatted_parts.append(f"{text}\n")
                 num_counter = 1
         
         elif b_type == 'divider':
-            lines.append("<hr>") # 구분선
+            formatted_parts.append("\n---\n")
             num_counter = 1
 
-    # ⭐️ 핵심 해결책: 모든 줄바꿈 문자를 <br> 태그로 변환
-    content_with_newlines = "\n".join(lines).strip()
-    html_content = content_with_newlines.replace("\n", "<br>")
+    # 모든 파트를 합친 후, 다시 한 번 줄바꿈이 뭉치지 않도록 조정
+    content = "".join(formatted_parts).strip()
     
-    return html_content
+    # 만약 여전히 뭉쳐 보인다면, 아래의 replace 구문을 활성화하세요.
+    # content = content.replace("\n", "\n\n") 
+    
+    return content
 
 def run_automation():
     headers = {
@@ -81,8 +84,9 @@ def run_automation():
     }
     
     target_date = get_target_date_kst()
+    print(f"조회 날짜: {target_date}")
+
     query = {"filter": {"property": "날짜", "date": {"equals": target_date}}}
-    
     res = requests.post(f"https://api.notion.com/v1/databases/{DATABASE_ID}/query", headers=headers, json=query)
     results = res.json().get('results', [])
 
@@ -94,7 +98,6 @@ def run_automation():
         name = member_data['name'].strip()
         if name in TEAM_INFO:
             email = TEAM_INFO[name]
-            # HTML 줄바꿈이 적용된 본문 가져오기
             page_content = get_page_body_content(page['id'])
 
             payload = {
@@ -105,7 +108,7 @@ def run_automation():
             }
             
             response = requests.post(API_URL, json=payload)
-            print(f"✅ {name} 전송 결과: {response.status_code}")
+            print(f"✅ {name} 전송 완료: {response.status_code}")
 
 if __name__ == "__main__":
     run_automation()
