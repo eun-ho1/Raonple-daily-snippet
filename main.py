@@ -2,10 +2,10 @@ import os
 import requests
 from datetime import datetime, timedelta
 
-# 환경 변수 설정 (기존과 동일)
+# 환경 변수 설정
 NOTION_TOKEN = os.environ.get('NOTION_TOKEN')
 DATABASE_ID = os.environ.get('DATABASE_ID')
-SNIPPET_API_KEY = os.environ.get('SNIPPET_API_KEY', '8195198d-500e-4082-aefd-bab59bfda0bf')
+SNIPPET_API_KEY = os.environ.get('SNIPPET_API_KEY')
 API_URL = "https://n8n.1000.school/webhook/0a43fbad-cc6d-4a5f-8727-b387c27de7c8"
 
 TEAM_INFO = {
@@ -15,12 +15,12 @@ TEAM_INFO = {
 }
 
 def get_target_date_kst():
-    # KST 기준 어제 날짜 (1월 15일 실행 시 14일 데이터 전송)
+    # KST 기준 어제 날짜
     target_dt = datetime.utcnow() + timedelta(hours=9) - timedelta(days=1)
     return target_dt.strftime("%Y-%m-%d")
 
 def get_page_body_content(page_id):
-    """노션 본문을 읽어 시스템이 무시하지 못하도록 강한 줄바꿈 형식을 생성합니다."""
+    """노션 블록을 읽어 HTML 줄바꿈이 적용된 텍스트로 변환합니다."""
     url = f"https://api.notion.com/v1/blocks/{page_id}/children"
     headers = {
         "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -28,53 +28,48 @@ def get_page_body_content(page_id):
     }
     
     response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        return "본문을 불러오지 못했습니다."
+
     blocks = response.json().get('results', [])
-    
-    formatted_parts = []
+    lines = []
     num_counter = 1
     
     for block in blocks:
         b_type = block['type']
         
-        # 텍스트 추출
-        if b_type in ['paragraph', 'bulleted_list_item', 'numbered_list_item', 'heading_1', 'heading_2', 'heading_3']:
+        # 모든 텍스트 블록에서 데이터 추출 시도
+        if b_type in block:
             rich_texts = block[b_type].get('rich_text', [])
+            if not rich_texts:
+                # 내용이 없는 빈 줄 처리
+                lines.append("")
+                continue
+                
             text = "".join([rt.get('plain_text', '') for rt in rich_texts])
             
-            if not text.strip(): # 빈 줄인 경우
-                formatted_parts.append("\n")
-                continue
-
-            # 1. 제목 처리 (가독성을 위해 위아래로 빈 줄 추가)
+            # 1. 제목 처리 (굵게 표시 및 위아래 간격)
             if b_type.startswith('heading_'):
-                formatted_parts.append(f"\n\n**{text}**\n")
+                lines.append(f"<br><b>{text}</b>")
                 num_counter = 1
             
-            # 2. 동그라미 불렛 처리 (패턴 인식 개선을 위해 * 사용)
+            # 2. 동그라미 리스트 처리 (특수기호 대신 표준 기호 사용)
             elif b_type == 'bulleted_list_item':
-                formatted_parts.append(f"• {text}\n")
+                lines.append(f"• {text}")
             
-            # 3. 숫자 리스트 처리 (정상 작동하는 패턴 유지)
+            # 3. 숫자 리스트 처리
             elif b_type == 'numbered_list_item':
-                formatted_parts.append(f"{num_counter}. {text}\n")
+                lines.append(f"{num_counter}. {text}")
                 num_counter += 1
             
-            # 4. 일반 문단
+            # 4. 일반 문단 및 기타
             else:
-                formatted_parts.append(f"{text}\n")
+                lines.append(text)
                 num_counter = 1
-        
-        elif b_type == 'divider':
-            formatted_parts.append("\n---\n")
-            num_counter = 1
 
-    # 모든 파트를 합친 후, 다시 한 번 줄바꿈이 뭉치지 않도록 조정
-    content = "".join(formatted_parts).strip()
-    
-    # 만약 여전히 뭉쳐 보인다면, 아래의 replace 구문을 활성화하세요.
-    # content = content.replace("\n", "\n\n") 
-    
-    return content
+    # ⭐️ 핵심 해결책: \n으로 합친 후 모든 개행을 <br>로 강제 치환
+    final_text = "<br>".join(lines).strip()
+    return final_text
 
 def run_automation():
     headers = {
@@ -84,9 +79,8 @@ def run_automation():
     }
     
     target_date = get_target_date_kst()
-    print(f"조회 날짜: {target_date}")
-
     query = {"filter": {"property": "날짜", "date": {"equals": target_date}}}
+    
     res = requests.post(f"https://api.notion.com/v1/databases/{DATABASE_ID}/query", headers=headers, json=query)
     results = res.json().get('results', [])
 
@@ -98,17 +92,25 @@ def run_automation():
         name = member_data['name'].strip()
         if name in TEAM_INFO:
             email = TEAM_INFO[name]
+            # 본문 내용 추출
             page_content = get_page_body_content(page['id'])
+            
+            # 페이지 제목 가져오기
+            title_list = props.get('제목', {}).get('title', [])
+            page_title = title_list[0]['plain_text'] if title_list else "Daily Snippet"
+
+            # 제목과 본문을 합쳐서 전송
+            full_content = f"<b>{page_title}</b><br>{page_content}"
 
             payload = {
                 "user_email": email,
                 "api_id": SNIPPET_API_KEY,
                 "snippet_date": target_date,
-                "content": page_content
+                "content": full_content
             }
             
             response = requests.post(API_URL, json=payload)
-            print(f"✅ {name} 전송 완료: {response.status_code}")
+            print(f"✅ {name}님 데이터 전송: {response.status_code}")
 
 if __name__ == "__main__":
     run_automation()
